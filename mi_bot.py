@@ -118,4 +118,3 @@ def generate_random_text(message):
 
 # Iniciar el bot
 bot.polling()
-
