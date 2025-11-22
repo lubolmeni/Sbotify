@@ -1,0 +1,4 @@
+google-generativeai
+pyTelegramBotAPI
+python-dotenv
+spotipy
