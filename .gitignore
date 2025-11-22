@@ -1,0 +1,24 @@
+# Directorios generados por Django
+pycache/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.swo
+*.bak
+.~
+
+# Archivos de configuración
+.env
+env
+venv
+.venv
+.env.local
+
+
+
+# Otros archivos generados por las aplicaciones core y loybox_auth
+.cache
+
+
+.DS_Store
