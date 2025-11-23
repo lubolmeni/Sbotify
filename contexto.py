@@ -15,7 +15,7 @@ class RespuestaPlaylist(typing.TypedDict):
 
 bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 
-@bot.message_handler(commands=['situacion'])
+@bot.message_handler(commands=['situación'])
 def send_situacion_playlist(message):
     
     # Extraer la situación del usuario y limpiar el comando
