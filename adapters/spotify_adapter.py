@@ -3,26 +3,28 @@ from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 
 load_dotenv()
-
 scope = "playlist-modify-public"
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(scope=scope))
 
-def buscar_en_spotify(query):
-    """
-    Busca una canción en Spotify y devuelve su URL.
-    """
-    results = sp.search(q=query, limit=1, type='track')
-    items = results['tracks']['items']
+def buscar_en_spotify(query, search_type="track"):
+    if search_type == 'podcast':
+        api_type = 'show'
+    elif search_type == 'track':   
+        api_type = 'track'
+    else:  
+        api_type = search_type
+    results = sp.search(q=query, limit=1, type=api_type)
+    key_plural = api_type + 's'
+    if api_type == 'show':
+        key_plural = 'shows'   
+    items = results.get(key_plural, {}).get('items', [])
     if len(items) > 0:
-        track = items[0]
-        return {'nombre': track['name'], 'url': track['external_urls']['spotify']}
+        item = items[0]   
+        return {'nombre': item.get('name', 'N/A'), 'url': item['external_urls']['spotify']}
     else:
-        return None
+        return {'nombre': 'No encontrado', 'url': None} 
 
 def crear_playlist(nombre, canciones):
-    """
-    Crea una playlist con el nombre dado y añade las canciones (URIs o URLs).
-    """
     user_id = sp.current_user()['id']
     playlist = sp.user_playlist_create(user=user_id, name=nombre, public=True)
     if canciones:
