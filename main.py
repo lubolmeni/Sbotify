@@ -246,8 +246,19 @@ def send_recomendacion(message):
 @bot.message_handler(commands=['playlist'])
 def send_playlist(message):
 
+   #Mensaje de respuesta formato json de Gemini
+   class RespuestaPlaylist(typing.TypedDict):
+      nombre: str
+      canciones: list[str]
+
+
    try:
 
+      user_canciones = message.text.replace("/playlist", "", 1).strip()
+
+      if not user_canciones:
+        bot.reply_to(message, "🎧 Por favor, indica las canciones que querés agregar a la playlist. Ejemplo: /playlist canciones de la semana")
+        return
       #Primero pedimos a gemini que nos devuelva el nombre de la playlist y las canciones
       resultado_canciones = preguntar_gemini(pregunta=message.text, instrucciones="Vas a recibir un mensaje con varias canciones para crear una playlist, organiza las canciones en una lista de nombres de canciones y el nombre de la playlist creado por vos", estructura_salida=RespuestaPlaylist)
 
@@ -266,7 +277,7 @@ def send_playlist(message):
    except Exception :
       bot.reply_to(message, "Lo siento, hubo un error al crear la playlist")
 
-   print("Mensaje enviado.")
+   print("Mensaje enviado.")
 
 # Iniciar el bot
 print("Bot iniciado")
