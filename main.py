@@ -7,75 +7,99 @@ from adapters.spotify_adapter import crear_playlist, buscar_en_spotify
 import json
 load_dotenv()
 
+# --- VARIABLE DE VERSIÓN ---
+BOT_VERSION = "1.0.0-alpha"
+
+# --- DEFINICIONES DE TIPOS GLOBALES ---
+# Usado por /animo, /recomendar, y /situación
+class RespuestaSpotify(typing.TypedDict):
+    keywords: str
+    search_type: typing.Literal["track", "playlist", "album", "artist", "podcast"]
+
+# Usado por /playlist
+class RespuestaPlaylist(typing.TypedDict):
+    nombre: str
+    canciones: list[str]
+# --------------------------------------
+
 bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 
+# --- HANDLER: Comando /start ---
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    bienvenida = (
+        "👋 **Bienvenidos a Sbotify**, su asistente personal para elegir la música que necesitan en el momento que necesitan.\n\n"
+        "Tenés las siguientes opciones para elegir tu próxima canción o playlist para disfrutar:\n\n"
+        "🎶 **/animo [estado]**: Pedí una canción o playlist en relación a como te sientas en este momento.\n"
+        "🗺️ **/situación [descripción]**: Pedile al bot una playlist para un momento determinado de tu día (estudiar, cocinar, etc.).\n"
+        "🎧 **/recomendar [tema/artista]**: Descubrí la mejor música de una época o lugar determinado (ej: artistas similares a The Cure).\n"
+        "➕ **/playlist [canciones]**: Creá una playlist con una lista de canciones específicas.\n\n"
+        "Todas estas opciones van a ser redirigidas a tu Spotify para que puedas seguirlo escuchando cuando quieras. Dicho todo esto... ¿Qué tenés ganas de escuchar hoy?"
+        "\n\n/animo\n/situación\n/recomendar"
+    )
+    bot.reply_to(message, bienvenida, parse_mode='Markdown')
+
+# --- HANDLER: Comando /version ---
+@bot.message_handler(commands=['version'])
+def send_version(message):
+    """Responde con la versión actual del bot."""
+    respuesta = f"🤖 La versión actual de Sbotify es: **{BOT_VERSION}**"
+    bot.reply_to(message, respuesta, parse_mode='Markdown')
+
+# --- HANDLER MODIFICADO: Comando /situación (Mismo estilo de recomendación que /animo y /recomendar) ---
 @bot.message_handler(commands=['situación', 'situacion'])
-def send_situacion_playlist(message):
+def send_situacion_recommendation(message):
+    
+    # Extraer la situación del usuario y limpiar ambos comandos
+    user_situation = message.text.replace("/situacion", "", 1).replace("/situación", "", 1).strip()
 
-    # Estructura de salida esperada de Gemini, similar a la usada en main.py
-    class RespuestaPlaylist(typing.TypedDict):
-        nombre: str
-        canciones: list[str] # Lista de búsquedas (keywords) para canciones
-    # Extraer la situación del usuario y limpiar el comando
-    user_situation = message.text.replace("/situacion", "", 1).strip()
-
+    # --- LÓGICA DE AUTOCOMPLETADO (Prompt para el usuario) ---
     if not user_situation:
-        bot.reply_to(message, "💬 Por favor, describí la situación para la que querés la playlist. Ejemplo: `/situacion necesito música instrumental tranquila para estudiar concentrado`")
+        bot.reply_to(message, "💬 Por favor, describí la situación para la que querés la recomendación. Ejemplo: `/situacion necesito música instrumental tranquila para estudiar concentrado`")
         return
 
     try:
-        # --- 1. Petición a Gemini para generar el nombre y las búsquedas de canciones ---
-        instrucciones_playlist = (
-            "Vas a recibir una descripción de una situación específica (ej: estudiar, cocinar, viajar, etc.). "
-            "Tu tarea es generar un nombre de playlist atractivo ('nombre') y una lista de 5 a 10 búsquedas de canciones ('canciones') "
-            "que se adapten perfectamente al ambiente y ritmo de esa situación. Las 'canciones' deben ser búsquedas precisas (Ej: 'Jazz suave para concentración', 'Rock instrumental de los 90', 'pop optimista para limpiar')."
-            "La salida debe seguir la estructura JSON provista."
+        # --- 1. Petición a Gemini para generar las búsquedas y el tipo de contenido ---
+        instrucciones_keywords = (
+            "Vas a recibir la descripción de una situación específica (ej: estudiar, cocinar, viajar, etc.). "
+            "Tu tarea es generar las palabras clave ('keywords') MÁS ESPECÍFICAS posibles para buscar en Spotify un contenido que se adapte perfectamente al ambiente y ritmo de esa situación. "
+            "Céntrate en géneros, estilo y tempo. Elige el 'search_type' más relevante de la lista: 'track', 'playlist', o 'album'. Una 'playlist' o 'album' suelen ser mejores para actividades largas."
         )
-
-        resultado_canciones_json = preguntar_gemini(
+        
+        resultado_keywords_json = preguntar_gemini(
             pregunta=f"Situación del usuario: {user_situation}",
-            instrucciones=instrucciones_playlist,
-            estructura_salida=RespuestaPlaylist
+            instrucciones=instrucciones_keywords,
+            estructura_salida=RespuestaSpotify
         )
 
-        resultado_canciones = json.loads(resultado_canciones_json)
-        playlist_nombre = resultado_canciones["nombre"]
-        canciones_queries = resultado_canciones["canciones"]
+        resultado_keywords = json.loads(resultado_keywords_json)
+        keywords = resultado_keywords["keywords"]
+        search_type = resultado_keywords["search_type"]
 
-        # --- 2. Buscar en Spotify por la URI de cada canción ---
-        canciones_uris = []
-        for query in canciones_queries:
-            # Buscar el primer resultado de tipo 'track' (canción) para cada keyword
-            spotify_result = buscar_en_spotify(query, search_type="track")
-            track_url = spotify_result.get("url")
+        # --- 2. Buscar en Spotify la recomendación (Una sola búsqueda) ---
+        spotify_result = buscar_en_spotify(keywords, search_type=search_type)
+        recomendacion_url = spotify_result.get("url")
 
-            if track_url:
-                # Se recolectan los URLs (que se asumen como URIs o son manejados por crear_playlist)
-                canciones_uris.append(track_url)
-
-        # Verificar si se encontraron tracks
-        if not canciones_uris:
-             bot.reply_to(message, f"❌ Lo siento, no pude encontrar canciones relevantes en Spotify para la situación: '{user_situation}'. Probá con una descripción más específica.")
+        if not recomendacion_url:
+             bot.reply_to(message, f"❌ Lo siento, no encontré un resultado relevante en Spotify para la situación: '{user_situation}' con la búsqueda '{keywords}'.")
              return
 
-        # --- 3. Crear la playlist en Spotify ---
-        url = crear_playlist(playlist_nombre, canciones_uris)
-
-        # --- 4. Generar la respuesta final con Gemini ---
+        # --- 3. Generar la respuesta final con Gemini ---
         instrucciones_respuesta_final = (
-            "Vas a recibir la situación original de un usuario y el URL de una playlist de Spotify que se acaba de crear."
+            "Vas a recibir la situación original de un usuario y el enlace de Spotify que se acaba de encontrar."
             "\n\n**TU TAREA PRINCIPAL ES GENERAR EL MENSAJE FINAL COMPLETO:**"
             "\n1. **Estilo:** La respuesta debe usar el **voseo** y tener un tono **amigable, informal y entusiasta**. Agregá emojis para hacerlo más canchero."
-            "\n2. **Contenido:** Generá un mensaje de **dos a tres líneas** que confirme que la playlist se creó, mencione el nombre que se le puso y que invite al usuario a disfrutar de la música para su situación."
-            "\n3. **Formato Final:** La respuesta debe ser UN ÚNICO BLOQUE DE TEXTO que combine el comentario y contenga el URL de la playlist de forma clara."
+            "\n2. **Contenido:** Generá un mensaje de **dos a tres líneas** que confirme la recomendación, mencione el tipo de contenido (playlist, álbum, etc.) y que invite al usuario a disfrutar de la música para su situación."
+            "\n3. **Formato Final:** La respuesta debe ser UN ÚNICO BLOQUE DE TEXTO que combine el comentario y contenga el URL de Spotify en una línea separada."
         )
 
         respuesta = preguntar_gemini(
-            pregunta=f"Situación original: {user_situation} \n Nombre de la playlist: {playlist_nombre} \n URL de la playlist: {url}",
+            pregunta=f"Situación original: {user_situation} \n Tipo de contenido sugerido: {search_type} \n URL de Spotify: {recomendacion_url}",
             instrucciones=instrucciones_respuesta_final
         )
+        
         bot.reply_to(message, respuesta)
-
+    
     except json.JSONDecodeError:
         bot.reply_to(message, "Hubo un error al procesar la respuesta de Gemini (formato JSON inválido).")
     except Exception as e:
@@ -84,18 +108,16 @@ def send_situacion_playlist(message):
         print(f"Tipo de Error: {type(e).__name__}")
         print(f"Mensaje de Error: {e}")
         print("="*50 + "\n")
-        bot.reply_to(message, "❌ Lo siento, hubo un error general al intentar crear la playlist para tu situación. Revisá la consola para más detalles.")
+        bot.reply_to(message, "❌ Lo siento, hubo un error general al intentar obtener la recomendación para tu situación. Revisá la consola para más detalles.")
 
-    print("Mensaje de playlist enviado.")
+    print("Mensaje de recomendación por situación enviado.")
 
 @bot.message_handler(commands=['animo'])
 def send_welcome(message):
 
-    class RespuestaSpotify(typing.TypedDict):
-        keywords: str
-        search_type: typing.Literal["track", "playlist", "album", "artist", "podcast"]
     user_mood = message.text.replace("/animo", "", 1).strip()
 
+    # --- LÓGICA DE AUTOCOMPLETADO (Prompt para el usuario) ---
     if not user_mood:
         bot.reply_to(message, "💬 Por favor, decime cómo te sentís. Ejemplo: `/animo necesito algo tranquilo porque estoy triste`")
         return
@@ -156,12 +178,10 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['recomendar'])
 def send_recomendacion(message):
-    class RespuestaSpotify(typing.TypedDict):
-        keywords: str
-        search_type: typing.Literal["track", "playlist", "album", "artist", "podcast"]
 
     user_topic = message.text.replace("/recomendar", "", 1).strip()
 
+    # --- LÓGICA DE AUTOCOMPLETADO (Prompt para el usuario) ---
     if not user_topic:
         bot.reply_to(message, "🎧 Por favor, indica un tema o artista para la recomendación. Ejemplo: `/recomendar artistas similares a The Cure`")
         return
@@ -226,11 +246,6 @@ def send_recomendacion(message):
 @bot.message_handler(commands=['playlist'])
 def send_playlist(message):
 
-   #Mensaje de respuesta formato json de Gemini
-   class RespuestaPlaylist(typing.TypedDict):
-      nombre: str
-      canciones: list[str]
-
    try:
 
       #Primero pedimos a gemini que nos devuelva el nombre de la playlist y las canciones
@@ -256,4 +271,3 @@ def send_playlist(message):
 # Iniciar el bot
 print("Bot iniciado")
 bot.polling()
-
