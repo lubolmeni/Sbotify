@@ -31,11 +31,11 @@ def send_welcome(message):
         "👋 **Bienvenidos a Sbotify**, su asistente personal para elegir la música que necesitan en el momento que necesitan.\n\n"
         "Tenés las siguientes opciones para elegir tu próxima canción o playlist para disfrutar:\n\n"
         "🎶 **/animo [estado]**: Pedí una canción o playlist en relación a como te sientas en este momento.\n"
-        "🗺️ **/situación [descripción]**: Pedile al bot una playlist para un momento determinado de tu día (estudiar, cocinar, etc.).\n"
+        "🗺️ **/situacion [descripción]**: Pedile al bot una playlist para un momento determinado de tu día (estudiar, cocinar, etc.).\n"
         "🎧 **/recomendar [tema/artista]**: Descubrí la mejor música de una época o lugar determinado (ej: artistas similares a The Cure).\n"
         "➕ **/playlist [canciones]**: Creá una playlist con una lista de canciones específicas.\n\n"
         "Todas estas opciones van a ser redirigidas a tu Spotify para que puedas seguirlo escuchando cuando quieras. Dicho todo esto... ¿Qué tenés ganas de escuchar hoy?"
-        "\n\n/animo\n/situación\n/recomendar"
+        "\n\n/animo\n/situacion\n/recomendar\n/playlist"
     )
     bot.reply_to(message, bienvenida, parse_mode='Markdown')
 
