@@ -28,7 +28,7 @@ bot = telebot.TeleBot(os.getenv("TELEGRAM_BOT_TOKEN"))
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bienvenida = (
-        "👋 **Bienvenidos a Sbotify**, su asistente personal para elegir la música que necesitan en el momento que necesitan.\n\n"
+        "👋 **Bienvenido a Sbotify**, tu asistente personal para elegir la música que necesitás en el momento que necesitás.\n\n"
         "Tenés las siguientes opciones para elegir tu próxima canción o playlist para disfrutar:\n\n"
         "🎶 **/animo [estado]**: Pedí una canción o playlist en relación a como te sientas en este momento.\n"
         "🗺️ **/situacion [descripción]**: Pedile al bot una playlist para un momento determinado de tu día (estudiar, cocinar, etc.).\n"
